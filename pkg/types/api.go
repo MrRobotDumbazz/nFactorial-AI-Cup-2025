@@ -9,7 +9,10 @@ type APIResponse struct {
 
 // Анализ изображений
 type ImageAnalysisRequest struct {
-	ImageURL string `json:"image_url"`
+	ImageURL    string `json:"image_url,omitempty"`    // URL изображения
+	ImageBase64 string `json:"image_base64,omitempty"` // Base64 encoded изображение
+	ImageFile   []byte `json:"image_file,omitempty"`   // Бинарные данные файла
+	ImageSource string `json:"image_source"`           // Тип источника: "url", "base64", "file"
 }
 
 type ImageAnalysisResponse struct {
