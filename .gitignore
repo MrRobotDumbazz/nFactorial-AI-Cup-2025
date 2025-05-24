@@ -1,54 +1,62 @@
-# Binaries for programs and plugins
+# Binaries and build artifacts
+bin/
+bootstrap
+*.zip
+
+# Go specific
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-bootstrap
-*.zip
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-vendor/
-
-# Go workspace file
-go.work
-
-# Environment variables and secrets
-.env
-*.env
-.env.local
-.aws/
-aws.json
-credentials.json
-*.pem
-*.key
-
-# IDE specific files
+# IDE specific
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
 
-# Build output
-bin/
-dist/
-build/
+# AWS credentials and sensitive data
+.aws/
+*.pem
+*.key
+credentials
+.env
+.env.*
+!.env.example
 
 # Lambda deployment packages
-*.zip
+**/lambda.zip
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+
+# Node.js (if using any Node.js tools)
+node_modules/
+npm-debug.log*
+
+# Python (if using any Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.env/
+.venv/
 
 # Logs
 *.log
 logs/
 
-# DynamoDB local
+# Local DynamoDB
 .dynamodb/
 
 # Temporary files
