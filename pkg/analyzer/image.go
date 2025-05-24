@@ -23,7 +23,7 @@ func NewImageAnalyzer(client *rekognition.Client) *ImageAnalyzer {
 	return &ImageAnalyzer{client: client}
 }
 
-func (a *ImageAnalyzer) AnalyzeImage(ctx context.Context, request customtypes.ImageAnalysisRequest) ([]string, error) {
+func (a *ImageAnalyzer) AnalyzeImage(ctx context.Context, request customtypes.ImageAnalysisRequestApi) ([]string, error) {
 	var imageBytes []byte
 	var err error
 

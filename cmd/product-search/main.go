@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 
 	"github.com/MrRobotDumbazz/nFactorial-AI-Cup-2025/pkg/marketplace"
 	"github.com/MrRobotDumbazz/nFactorial-AI-Cup-2025/pkg/types"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -24,30 +26,71 @@ func init() {
 	productService = marketplace.NewProductService(dynamoClient)
 }
 
-func handleRequest(ctx context.Context, request types.ProductSearchRequest) (types.APIResponse, error) {
-	// Проверка входных данных
-	if len(request.Categories) == 0 {
-		return types.APIResponse{
-			Success: false,
-			Error:   "at least one category is required",
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	headers := map[string]string{
+		"Access-Control-Allow-Origin": "*",
+		"Content-Type":                "application/json",
+	}
+
+	if request.HTTPMethod == "OPTIONS" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers:    headers,
 		}, nil
 	}
 
-	// Поиск товаров
-	products, err := productService.SearchProducts(ctx, request.Categories, request.PriceRange, request.Marketplace)
+	var searchRequest types.ProductSearchRequestApi
+	if err := json.Unmarshal([]byte(request.Body), &searchRequest); err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error":"Invalid request body"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	if len(searchRequest.Categories) == 0 {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error":"at least one category is required"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	var priceRange types.Range
+	if searchRequest.PriceRange != nil {
+		priceRange = *searchRequest.PriceRange
+	}
+
+	products, err := productService.SearchProducts(ctx, searchRequest.Categories, priceRange, searchRequest.Marketplace)
 	if err != nil {
 		log.Printf("Failed to search products: %v", err)
-		return types.APIResponse{
-			Success: false,
-			Error:   "failed to search products",
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error":"failed to search products"}`,
+			Headers:    headers,
 		}, nil
 	}
 
-	return types.APIResponse{
+	response := types.ApiResponse{
 		Success: true,
-		Data: types.ProductSearchResponse{
+		Data: types.ProductSearchResponseApi{
 			Products: products,
 		},
+	}
+
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error":"Failed to marshal response"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Body:       string(responseJSON),
+		Headers:    headers,
 	}, nil
 }
 

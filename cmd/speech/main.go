@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 
 	"github.com/MrRobotDumbazz/nFactorial-AI-Cup-2025/pkg/translator"
 	"github.com/MrRobotDumbazz/nFactorial-AI-Cup-2025/pkg/types"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/polly"
@@ -34,37 +36,75 @@ func init() {
 	speechService = translator.NewTranslator(nil, pollyClient, s3Client, bucketName)
 }
 
-func handleRequest(ctx context.Context, request types.SpeechRequest) (types.APIResponse, error) {
-	// Проверка входных данных
-	if request.Text == "" {
-		return types.APIResponse{
-			Success: false,
-			Error:   "text is required",
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	headers := map[string]string{
+		"Access-Control-Allow-Origin": "*",
+		"Content-Type":                "application/json",
+	}
+
+	if request.HTTPMethod == "OPTIONS" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers:    headers,
 		}, nil
 	}
 
-	if request.Language == "" {
-		return types.APIResponse{
-			Success: false,
-			Error:   "language is required",
+	var speechRequest types.SpeechRequestApi
+	if err := json.Unmarshal([]byte(request.Body), &speechRequest); err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error":"Invalid request body"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	if speechRequest.Text == "" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error":"text is required"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	if speechRequest.Language == "" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error":"language is required"}`,
+			Headers:    headers,
 		}, nil
 	}
 
 	// Преобразование текста в речь
-	audioURL, err := speechService.TextToSpeech(ctx, request.Text, request.Language)
+	audioURL, err := speechService.TextToSpeech(ctx, speechRequest.Text, speechRequest.Language)
 	if err != nil {
 		log.Printf("Failed to synthesize speech: %v", err)
-		return types.APIResponse{
-			Success: false,
-			Error:   "failed to synthesize speech",
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error":"failed to synthesize speech"}`,
+			Headers:    headers,
 		}, nil
 	}
 
-	return types.APIResponse{
+	response := types.ApiResponse{
 		Success: true,
-		Data: types.SpeechResponse{
+		Data: types.SpeechResponseApi{
 			AudioURL: audioURL,
 		},
+	}
+
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error":"Failed to marshal response"}`,
+			Headers:    headers,
+		}, nil
+	}
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Body:       string(responseJSON),
+		Headers:    headers,
 	}, nil
 }
 

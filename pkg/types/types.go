@@ -117,3 +117,54 @@ var AgeCategories = map[string][]string{
 		"health",
 	},
 }
+
+// Структуры для API ответов
+type ApiResponse struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
+// Структуры для переводчика
+type TranslationRequestApi struct {
+	Text           string `json:"text"`
+	TargetLanguage string `json:"target_language"`
+}
+
+type TranslationResponseApi struct {
+	TranslatedText string `json:"translated_text"`
+}
+
+// Структуры для анализа изображений
+type ImageAnalysisRequestApi struct {
+	ImageURL    string `json:"image_url,omitempty"`    // URL изображения
+	ImageBase64 string `json:"image_base64,omitempty"` // Base64 encoded изображение
+	ImageFile   []byte `json:"image_file,omitempty"`   // Бинарные данные файла
+	ImageSource string `json:"image_source"`           // Тип источника: "url", "base64", "file"
+}
+
+type ImageAnalysisResponseApi struct {
+	Labels     []string `json:"labels"`
+	Categories []string `json:"categories"`
+}
+
+// Структуры для синтеза речи
+type SpeechRequestApi struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+}
+
+type SpeechResponseApi struct {
+	AudioURL string `json:"audio_url"`
+}
+
+// Структуры для поиска продуктов
+type ProductSearchRequestApi struct {
+	Categories  []string `json:"categories"`
+	PriceRange  *Range   `json:"price_range,omitempty"`
+	Marketplace string   `json:"marketplace,omitempty"`
+}
+
+type ProductSearchResponseApi struct {
+	Products []Product `json:"products"`
+}

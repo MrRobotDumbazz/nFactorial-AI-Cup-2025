@@ -66,3 +66,14 @@ type ProductApi struct {
 	ImageURL    string   `json:"image_url"`
 	Tags        []string `json:"tags,omitempty"`
 }
+
+// GetCORSHeaders возвращает стандартные CORS заголовки
+func GetCORSHeaders() map[string]string {
+	return map[string]string{
+		"Access-Control-Allow-Origin":      "*",
+		"Access-Control-Allow-Methods":     "GET,POST,PUT,DELETE,OPTIONS",
+		"Access-Control-Allow-Headers":     "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+		"Access-Control-Allow-Credentials": "true",
+		"Content-Type":                     "application/json",
+	}
+}
