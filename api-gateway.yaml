@@ -1,0 +1,261 @@
+openapi: 3.0.0
+info:
+  title: Gift Recommendation API
+  description: API for gift recommendation service with image analysis, translation, text-to-speech and product search capabilities
+  version: 1.0.0
+  
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com/{stage}
+    variables:
+      apiId:
+        default: your-api-id
+        description: API Gateway ID
+      region:
+        default: us-east-1
+        description: AWS Region
+      stage:
+        default: prod
+        description: API Stage
+
+paths:
+  /analyze-image:
+    post:
+      summary: Analyze image for gift recommendations
+      description: Analyzes an image using AWS Rekognition to detect objects and scenes for gift recommendations
+      operationId: analyzeImage
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:image-analyzer/invocations
+        type: aws_proxy
+        httpMethod: POST
+        credentials: arn:aws:iam::${accountId}:role/api-gateway-lambda-role
+        passthroughBehavior: when_no_match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image_url:
+                  type: string
+                  description: URL of the image to analyze
+              required:
+                - image_url
+      responses:
+        '200':
+          description: Successful analysis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                      categories:
+                        type: array
+                        items:
+                          type: string
+        '400':
+          description: Invalid request
+        '500':
+          description: Server error
+      
+  /translate:
+    post:
+      summary: Translate text
+      description: Translates text using AWS Translate
+      operationId: translateText
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:translator/invocations
+        type: aws_proxy
+        httpMethod: POST
+        credentials: arn:aws:iam::${accountId}:role/api-gateway-lambda-role
+        passthroughBehavior: when_no_match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Text to translate
+                target_language:
+                  type: string
+                  description: Target language code (e.g. 'en', 'ru', 'kk')
+              required:
+                - text
+                - target_language
+      responses:
+        '200':
+          description: Successful translation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      translated_text:
+                        type: string
+        '400':
+          description: Invalid request
+        '500':
+          description: Server error
+
+  /text-to-speech:
+    post:
+      summary: Convert text to speech
+      description: Converts text to speech using AWS Polly
+      operationId: textToSpeech
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:speech/invocations
+        type: aws_proxy
+        httpMethod: POST
+        credentials: arn:aws:iam::${accountId}:role/api-gateway-lambda-role
+        passthroughBehavior: when_no_match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Text to convert to speech
+                language:
+                  type: string
+                  description: Language code for speech synthesis
+              required:
+                - text
+                - language
+      responses:
+        '200':
+          description: Successful conversion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      audio_url:
+                        type: string
+                        description: URL to the generated audio file
+        '400':
+          description: Invalid request
+        '500':
+          description: Server error
+
+  /search-products:
+    post:
+      summary: Search for gift products
+      description: Searches for gift products based on categories and filters
+      operationId: searchProducts
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:product-search/invocations
+        type: aws
+        httpMethod: POST
+        credentials: arn:aws:iam::${accountId}:role/api-gateway-lambda-role
+        requestTemplates:
+          application/json: |
+            {
+              "categories": $input.json('$.categories'),
+              "price_range": $input.json('$.price_range'),
+              "marketplace": $input.json('$.marketplace')
+            }
+        responses:
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "success": true,
+                  "data": {
+                    "products": $inputRoot.products
+                  }
+                }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                categories:
+                  type: array
+                  items:
+                    type: string
+                  description: Product categories to search in
+                price_range:
+                  type: object
+                  properties:
+                    min:
+                      type: number
+                    max:
+                      type: number
+                marketplace:
+                  type: string
+                  description: Specific marketplace to search in (optional)
+              required:
+                - categories
+      responses:
+        '200':
+          description: Successful search
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      products:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            price:
+                              type: number
+                            description:
+                              type: string
+                            image_url:
+                              type: string
+                            marketplace:
+                              type: string
+        '400':
+          description: Invalid request
+        '500':
+          description: Server error
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      name: x-api-key
+      in: header
+
+security:
+  - ApiKeyAuth: [] 

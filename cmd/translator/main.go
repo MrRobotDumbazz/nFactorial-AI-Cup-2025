@@ -33,6 +33,17 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		"Content-Type":                "application/json",
 	}
 
+	// Подробное логирование запроса
+	log.Printf("=== START REQUEST DEBUGGING ===")
+	log.Printf("Full request struct: %#v", request)
+	log.Printf("Request body (raw): %q", request.Body)
+	log.Printf("Request body length: %d", len(request.Body))
+	log.Printf("Request headers: %#v", request.Headers)
+	log.Printf("Request method: %s", request.HTTPMethod)
+	log.Printf("Request path: %s", request.Path)
+	log.Printf("IsBase64Encoded: %v", request.IsBase64Encoded)
+	log.Printf("=== END REQUEST DEBUGGING ===")
+
 	if request.HTTPMethod == "OPTIONS" {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 200,
@@ -40,15 +51,44 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	var translationRequest types.TranslationRequestApi
-	if err := json.Unmarshal([]byte(request.Body), &translationRequest); err != nil {
-		log.Printf("Failed to unmarshal request body: %v. Body: %s", err, request.Body)
+	// Проверяем, что тело запроса не пустое
+	if request.Body == "" {
+		log.Printf("Empty request body received")
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
-			Body:       fmt.Sprintf(`{"error":"Invalid request body: %v"}`, err),
+			Body:       `{"error":"Request body is empty"}`,
 			Headers:    headers,
 		}, nil
 	}
+
+	// Пробуем распарсить тело запроса напрямую
+	var translationRequest types.TranslationRequestApi
+	if err := json.Unmarshal([]byte(request.Body), &translationRequest); err != nil {
+		log.Printf("Failed to unmarshal request body: %v. Body: %s", err, request.Body)
+
+		// Если не получилось, пробуем распарсить как строку JSON
+		var jsonStr string
+		if err := json.Unmarshal([]byte(request.Body), &jsonStr); err == nil {
+			// Если это строка JSON, пробуем распарсить её
+			if err := json.Unmarshal([]byte(jsonStr), &translationRequest); err != nil {
+				log.Printf("Failed to unmarshal JSON string: %v. String: %s", err, jsonStr)
+				return events.APIGatewayProxyResponse{
+					StatusCode: 400,
+					Body:       fmt.Sprintf(`{"error":"Invalid request body format: %v"}`, err),
+					Headers:    headers,
+				}, nil
+			}
+		} else {
+			return events.APIGatewayProxyResponse{
+				StatusCode: 400,
+				Body:       fmt.Sprintf(`{"error":"Invalid request body: %v"}`, err),
+				Headers:    headers,
+			}, nil
+		}
+	}
+
+	// Логируем успешно распарсенный запрос
+	log.Printf("Successfully parsed translation request: %#v", translationRequest)
 
 	if translationRequest.Text == "" {
 		return events.APIGatewayProxyResponse{

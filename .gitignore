@@ -11,6 +11,7 @@ bootstrap
 *.dylib
 *.test
 *.out
+*.md
 
 # IDE specific
 .idea/
