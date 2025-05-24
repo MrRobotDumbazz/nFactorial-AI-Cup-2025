@@ -1,168 +1,93 @@
-# Gift Recommendation Service
+# nFactorial-AI-Cup-2025
 
-Сервис рекомендации подарков с использованием AWS Lambda и различных сервисов AWS.
+Fork this repository and build nFactorial AI Cup 2025 projects
 
-## Структура API
+**Name:** MrRobotDumbazz
 
-### 1. Анализ изображений
-- **Endpoint**: `POST /analyze-image`
-- **Request**:
-```json
-{
-    "image_url": "https://example.com/image.jpg"
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "data": {
-        "labels": ["phone", "electronics", "smartphone"],
-        "categories": ["electronics", "gadgets"]
-    }
-}
-```
+**App Name:** AI Gift Advisor
 
-### 2. Перевод текста
-- **Endpoint**: `POST /translate`
-- **Request**:
-```json
-{
-    "text": "Hello world",
-    "target_language": "ru"
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "data": {
-        "translated_text": "Привет мир"
-    }
-}
-```
+## Description
 
-### 3. Озвучка текста
-- **Endpoint**: `POST /text-to-speech`
-- **Request**:
-```json
-{
-    "text": "Hello world",
-    "language": "en-US"
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "data": {
-        "audio_url": "https://your-bucket.s3.amazonaws.com/audio/123.mp3"
-    }
-}
+AI Gift Advisor - это интеллектуальный сервис рекомендации подарков, использующий различные AWS сервисы для анализа и персонализации подарков.
+
+### Технические особенности
+
+1. **Архитектура:**
+   - Serverless архитектура на AWS Lambda
+   - API Gateway для REST API
+   - DynamoDB для хранения данных о товарах
+   - S3 для хранения аудио файлов
+
+2. **AWS Сервисы:**
+   - Amazon Rekognition для анализа изображений
+   - Amazon Translate для перевода описаний
+   - Amazon Polly для озвучки описаний
+   - DynamoDB для поиска товаров
+
+3. **API Endpoints:**
+   - `POST /analyze-image` - анализ изображений для определения категорий
+   - `POST /translate` - перевод описаний товаров
+   - `POST /text-to-speech` - озвучка описаний
+   - `POST /search-products` - поиск товаров по категориям
+
+4. **Стек технологий:**
+   - Go 1.24.2
+   - AWS SDK v2
+   - AWS Lambda Go Runtime
+   - DynamoDB
+   - API Gateway
+
+## Локальная разработка
+
+1. Клонируйте репозиторий:
+```bash
+git clone https://github.com/your-username/nFactorial-AI-Cup-2025.git
+cd nFactorial-AI-Cup-2025
 ```
 
-### 4. Поиск товаров
-- **Endpoint**: `POST /search-products`
-- **Request**:
-```json
-{
-    "categories": ["electronics", "gadgets"],
-    "price_range": {
-        "min": 100,
-        "max": 1000
-    },
-    "marketplace": "amazon"
-}
-```
-- **Response**:
-```json
-{
-    "success": true,
-    "data": {
-        "products": [
-            {
-                "id": "123",
-                "name": "Smartphone",
-                "description": "Latest model",
-                "price": 599.99,
-                "category": "electronics",
-                "image_url": "https://example.com/phone.jpg"
-            }
-        ]
-    }
-}
+2. Установите зависимости:
+```bash
+go mod tidy
 ```
 
-## Тестирование в Postman
-
-1. Создайте новую коллекцию в Postman
-2. Добавьте переменную окружения `api_url` с базовым URL вашего API Gateway
-3. Импортируйте следующие запросы:
-
-### Анализ изображений
-```
-POST {{api_url}}/analyze-image
-Content-Type: application/json
-
-{
-    "image_url": "https://example.com/image.jpg"
-}
+3. Настройте переменные окружения:
+```bash
+cp .env.example .env
+# Отредактируйте .env файл
 ```
 
-### Перевод текста
-```
-POST {{api_url}}/translate
-Content-Type: application/json
-
-{
-    "text": "Hello world",
-    "target_language": "ru"
-}
-```
-
-### Озвучка текста
-```
-POST {{api_url}}/text-to-speech
-Content-Type: application/json
-
-{
-    "text": "Hello world",
-    "language": "en-US"
-}
-```
-
-### Поиск товаров
-```
-POST {{api_url}}/search-products
-Content-Type: application/json
-
-{
-    "categories": ["electronics", "gadgets"],
-    "price_range": {
-        "min": 100,
-        "max": 1000
-    },
-    "marketplace": "amazon"
-}
-```
-
-## Переменные окружения
-
-Для работы Lambda функций требуются следующие переменные окружения:
-
-- `AUDIO_BUCKET_NAME` - имя S3 бакета для хранения аудио файлов
-- `AWS_REGION` - регион AWS (например, us-east-1)
-- `DYNAMODB_TABLE` - имя таблицы DynamoDB для хранения товаров
-
-## Развертывание
-
-1. Убедитесь, что у вас установлен AWS CLI и настроены учетные данные
-2. Выполните `go mod tidy` для установки зависимостей
-3. Соберите каждую Lambda функцию:
+4. Соберите Lambda функции:
 ```bash
 GOOS=linux GOARCH=amd64 go build -o bootstrap cmd/image-analyzer/main.go
 zip image-analyzer.zip bootstrap
 # Повторите для остальных функций
 ```
-4. Загрузите ZIP-файлы в AWS Lambda
-5. Настройте API Gateway для маршрутизации запросов к соответствующим функциям 
+
+## Развертывание
+
+1. Создайте необходимые AWS ресурсы:
+   - DynamoDB таблицу
+   - S3 бакет
+   - IAM роли (см. `/iam/README.md`)
+
+2. Загрузите Lambda функции:
+   - Создайте новые Lambda функции в AWS Console
+   - Загрузите ZIP-файлы
+   - Настройте триггеры API Gateway
+
+3. Настройте переменные окружения в AWS Lambda:
+   - `AUDIO_BUCKET_NAME`
+   - `AWS_REGION`
+   - `DYNAMODB_TABLE`
+
+## Тестирование
+
+Подробные инструкции по тестированию API через Postman находятся в разделе "Тестирование в Postman" ниже.
+
+[Полная документация по тестированию API]
+
+## Typeform для сдачи проекта
+
+https://docs.google.com/forms/d/e/1FAIpQLSdjbTZXt-8P0OTyMEDTQDszE-YGI5KcLYsN6pwxHmX0Fa3tzg/viewform?usp=dialog
+
+**DEADLINE:** 25/05/2025 10:00 
