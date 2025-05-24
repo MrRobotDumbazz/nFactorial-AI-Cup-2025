@@ -3,6 +3,7 @@ package translator
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,20 +30,22 @@ func NewTranslator(translateClient *translate.Client, pollyClient *polly.Client,
 }
 
 func (t *Translator) TranslateText(ctx context.Context, text, targetLang string) (string, error) {
+	log.Printf("Starting translation request: text=%s, targetLang=%s", text, targetLang)
+
 	input := &translate.TranslateTextInput{
 		Text:               aws.String(text),
-		SourceLanguageCode: aws.String("en"), // Явно указываем английский как исходный язык
+		SourceLanguageCode: aws.String("auto"), // Используем автоопределение языка
 		TargetLanguageCode: aws.String(targetLang),
 	}
 
-	fmt.Printf("Sending translation request: %+v\n", input)
+	log.Printf("Sending translation request to AWS Translate: %+v", input)
 	output, err := t.translateClient.TranslateText(ctx, input)
 	if err != nil {
-		fmt.Printf("Translation error: %v\n", err)
-		return "", fmt.Errorf("failed to translate text: %v", err)
+		log.Printf("Translation error: %v", err)
+		return "", err
 	}
 
-	fmt.Printf("Translation successful: %s -> %s\n", text, *output.TranslatedText)
+	log.Printf("Translation successful: %s -> %s", text, *output.TranslatedText)
 	return *output.TranslatedText, nil
 }
 
