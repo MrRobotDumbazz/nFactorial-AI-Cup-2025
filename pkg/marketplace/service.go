@@ -3,9 +3,8 @@ package marketplace
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
-	"sync"
+	"strings"
 
 	"github.com/MrRobotDumbazz/nFactorial-AI-Cup-2025/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -14,9 +13,9 @@ import (
 )
 
 type ProductService struct {
-	dynamoClient *dynamodb.Client
-	aiSearch     *AISearchService
-	tableName    string
+	dynamoClient  *dynamodb.Client
+	serperService *SerperService
+	tableName     string
 }
 
 func NewProductService(dynamoClient *dynamodb.Client) *ProductService {
@@ -25,78 +24,111 @@ func NewProductService(dynamoClient *dynamodb.Client) *ProductService {
 		tableName = "products" // значение по умолчанию
 	}
 
-	// Получаем токен Serper API из переменных окружения
-	serperToken := os.Getenv("SERPER_API_TOKEN")
-	aiSearch := NewAISearchService(serperToken)
+	serperService, err := NewSerperService()
+	if err != nil {
+		// Логируем ошибку, но продолжаем работу только с DynamoDB
+		fmt.Printf("Failed to initialize Serper service: %v\n", err)
+	}
 
 	return &ProductService{
-		dynamoClient: dynamoClient,
-		aiSearch:     aiSearch,
-		tableName:    tableName,
+		dynamoClient:  dynamoClient,
+		serperService: serperService,
+		tableName:     tableName,
 	}
 }
 
 func (s *ProductService) SearchProducts(ctx context.Context, categories []string, priceRange types.Range, marketplace string) ([]types.Product, error) {
-	var wg sync.WaitGroup
-	var mu sync.Mutex
 	var allProducts []types.Product
-	errors := make(chan error, 2)
 
 	// Поиск в DynamoDB
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		products, err := s.searchInDynamoDB(ctx, categories, priceRange, marketplace)
+	dbProducts, err := s.searchInDynamoDB(ctx, categories, priceRange, marketplace)
+	if err != nil {
+		fmt.Printf("DynamoDB search error: %v\n", err)
+		// Продолжаем работу, даже если DynamoDB недоступен
+	} else {
+		allProducts = append(allProducts, dbProducts...)
+	}
+
+	// Если Serper сервис доступен, используем его для поиска
+	if s.serperService != nil {
+		// Формируем поисковый запрос
+		query := s.buildSearchQuery(categories, priceRange, marketplace)
+
+		serperProducts, err := s.serperService.SearchProducts(ctx, query)
 		if err != nil {
-			errors <- fmt.Errorf("dynamodb search error: %v", err)
-			return
-		}
-		mu.Lock()
-		allProducts = append(allProducts, products...)
-		mu.Unlock()
-	}()
-
-	// Поиск через AI Search
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		products, err := s.aiSearch.SearchProducts(ctx, categories, priceRange, marketplace)
-		if err != nil {
-			errors <- fmt.Errorf("ai search error: %v", err)
-			return
-		}
-		mu.Lock()
-		allProducts = append(allProducts, products...)
-		mu.Unlock()
-	}()
-
-	// Ждем завершения всех поисков
-	wg.Wait()
-	close(errors)
-
-	// Проверяем ошибки
-	var errStrings []string
-	for err := range errors {
-		log.Printf("Search error: %v", err)
-		errStrings = append(errStrings, err.Error())
-	}
-
-	// Удаляем дубликаты по ID продукта
-	uniqueProducts := make(map[string]types.Product)
-	for _, product := range allProducts {
-		// Предпочитаем результаты из AI поиска (они более актуальные)
-		if _, exists := uniqueProducts[product.ID]; !exists || product.Store != "dynamodb" {
-			uniqueProducts[product.ID] = product
+			fmt.Printf("Serper search error: %v\n", err)
+		} else {
+			// Фильтруем результаты по категориям и ценовому диапазону
+			for _, product := range serperProducts {
+				if s.matchesFilters(product, categories, priceRange, marketplace) {
+					allProducts = append(allProducts, product)
+				}
+			}
 		}
 	}
 
-	// Преобразуем обратно в слайс
-	result := make([]types.Product, 0, len(uniqueProducts))
-	for _, product := range uniqueProducts {
-		result = append(result, product)
+	// Удаляем дубликаты
+	return s.removeDuplicates(allProducts), nil
+}
+
+func (s *ProductService) buildSearchQuery(categories []string, priceRange types.Range, marketplace string) string {
+	// Базовый запрос
+	query := strings.Join(categories, " OR ")
+
+	// Добавляем ценовой диапазон
+	if priceRange.Min > 0 || priceRange.Max > 0 {
+		query += fmt.Sprintf(" price:%d..%d", int(priceRange.Min), int(priceRange.Max))
 	}
 
-	return result, nil
+	// Добавляем маркетплейс
+	if marketplace != "" {
+		query += " site:" + marketplace
+	}
+
+	return query
+}
+
+func (s *ProductService) matchesFilters(product types.Product, categories []string, priceRange types.Range, marketplace string) bool {
+	// Проверка категории
+	categoryMatch := false
+	for _, category := range categories {
+		if strings.Contains(strings.ToLower(product.Category), strings.ToLower(category)) {
+			categoryMatch = true
+			break
+		}
+	}
+	if !categoryMatch {
+		return false
+	}
+
+	// Проверка цены
+	if priceRange.Min > 0 && product.Price < priceRange.Min {
+		return false
+	}
+	if priceRange.Max > 0 && product.Price > priceRange.Max {
+		return false
+	}
+
+	// Проверка маркетплейса
+	if marketplace != "" && product.Store != marketplace {
+		return false
+	}
+
+	return true
+}
+
+func (s *ProductService) removeDuplicates(products []types.Product) []types.Product {
+	seen := make(map[string]bool)
+	unique := make([]types.Product, 0)
+
+	for _, product := range products {
+		if !seen[product.ID] {
+			seen[product.ID] = true
+			unique = append(unique, product)
+		}
+	}
+
+	return unique
 }
 
 func (s *ProductService) searchInDynamoDB(ctx context.Context, categories []string, priceRange types.Range, marketplace string) ([]types.Product, error) {
