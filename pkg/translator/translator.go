@@ -34,7 +34,7 @@ func (t *Translator) TranslateText(ctx context.Context, text, targetLang string)
 
 	input := &translate.TranslateTextInput{
 		Text:               aws.String(text),
-		SourceLanguageCode: aws.String("auto"), // Используем автоопределение языка
+		SourceLanguageCode: aws.String("en"), // Используем автоопределение языка
 		TargetLanguageCode: aws.String(targetLang),
 	}
 
